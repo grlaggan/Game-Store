@@ -26,7 +26,5 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 function create_block_blocks_gamestore_block_init() {
 	wp_register_block_types_from_metadata_collection( __DIR__ . '/build', __DIR__ . '/build/blocks-manifest.php' );
-	register_block_type(__DIR__ . '/build/block-hero');
-	register_block_type(__DIR__ . '/build/block-contact');
 }
 add_action( 'init', 'create_block_blocks_gamestore_block_init' );
