@@ -45,10 +45,10 @@ jobs:
           password: ${{ secrets.SERVER_PASSWORD }}
           port: ${{ secrets.SERVER_PORT }}
           script: |
-            find "${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}/" -type f -name "*.php" ! -name "wp-config.php" -delete
-            rm -r "${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}/wp-admin/ ${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}/wp-includes/"
-            unzip -o "${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}/wordpress.zip" -d "${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}/"
-            rm -r "${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}/wordpress/"
+            find "${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}" -type f -name "*.php" ! -name "wp-config.php" -delete
+            rm -r "${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}wp-admin/ ${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}wp-includes/"
+            unzip -o "${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}wordpress.zip" -d "${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}"
+            rm -r "${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}wordpress/"
       - name: Update Plugins and Theme
         uses: appleboy/ssh-action@master
         with:
@@ -57,8 +57,8 @@ jobs:
           password: ${{ secrets.SERVER_PASSWORD }}
           port: ${{ secrets.SERVER_PORT }}
           script: |
-            rm -rf "${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}/wp-content/plugins/ ${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}/wp-content/themes/ ${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}/wp-content/mu-plugins/"
-            unzip -o "${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}/wpcontent.zip" -d "${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}/wp-content/"
+            rm -rf "${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}wp-content/plugins/ ${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}wp-content/themes/ ${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}wp-content/mu-plugins/"
+            unzip -o "${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}wpcontent.zip" -d "${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}wp-content/"
       - name: Disable Maintenance Mode and Remove zips
         uses: appleboy/ssh-action@master
         with:
@@ -67,6 +67,6 @@ jobs:
           password: ${{ secrets.SERVER_PASSWORD }}
           port: ${{ secrets.SERVER_PORT }}
           script: |
-            rm -f "${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}/.maintenance"
-            rm -f "${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}/wordpress.zip"
-            rm -f "${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}/wpcontent.zip"
+            rm -f "${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}.maintenance"
+            rm -f "${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}wordpress.zip"
+            rm -f "${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}wpcontent.zip"
