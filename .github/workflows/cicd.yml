@@ -1,43 +1,38 @@
 name: GameStore Deploy
 
 on:
-    push:
-      branches:
-        - dev
-    release:
-      types: [published]
+  push:
+    branches:
+      - dev
+  release:
+    types: [published]
 
 jobs:
-    deploy:
-      runs-on: ubuntu-latest
-      steps:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
       - name: Checkout
         uses: actions/checkout@master
-      - name: Prepare Wordpress zip
+
+      - name: Prepare WordPress archive
         run: |
           WP_LINK=$(cat wp-version-control.cfg)
-          wget -O "./wordpress.zip" $WP_LINK
-      - name: Prepare plugings and theme zip
+          wget -O "./wordpress.zip" "$WP_LINK"
+
+      - name: Prepare plugins and themes archive
         run: zip -r wpcontent.zip plugins themes mu-plugins
-      - name: Copy Zips to server
+
+      - name: Copy deployment files to server
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
           port: ${{ secrets.SERVER_PORT }}
-          source: "./wordpress.zip, ./wpcontent.zip"
+          source: "./wordpress.zip, ./wpcontent.zip, ./docker-compose.yml"
           target: ${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}
-      - name: Enable Maintenance Mode
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          password: ${{ secrets.SERVER_PASSWORD }}
-          port: ${{ secrets.SERVER_PORT }}
-          source: "./.maintenance"
-          target: ${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}
-      - name: Update Wordpress Core
+
+      - name: Deploy and start Docker containers
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -45,28 +40,33 @@ jobs:
           password: ${{ secrets.SERVER_PASSWORD }}
           port: ${{ secrets.SERVER_PORT }}
           script: |
-            find "${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}" -type f -name "*.php" ! -name "wp-config.php" -delete
-            rm -r "${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}wp-admin/ ${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}wp-includes/"
-            unzip -o "${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}wordpress.zip" -d "${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}"
-            rm -r "${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}wordpress/"
-      - name: Update Plugins and Theme
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          password: ${{ secrets.SERVER_PASSWORD }}
-          port: ${{ secrets.SERVER_PORT }}
-          script: |
-            rm -rf "${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}wp-content/plugins/ ${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}wp-content/themes/ ${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}wp-content/mu-plugins/"
-            unzip -o "${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}wpcontent.zip" -d "${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}wp-content/"
-      - name: Disable Maintenance Mode and Remove zips
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          password: ${{ secrets.SERVER_PASSWORD }}
-          port: ${{ secrets.SERVER_PORT }}
-          script: |
-            rm -f "${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}.maintenance"
-            rm -f "${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}wordpress.zip"
-            rm -f "${{ github.event_name == 'push' && 'public_html/dev/' || 'public_html/live/' }}wpcontent.zip"
+            set -eu
+            TARGET="${{ github.event_name == 'push' && 'public_html/dev' || 'public_html/live' }}"
+            WP_ROOT="$TARGET/.srv/wordpress"
+            COMPOSE_FILE="$TARGET/docker-compose.yml"
+
+            command -v docker
+            docker compose version
+            mkdir -p "$WP_ROOT"
+            touch "$WP_ROOT/.maintenance"
+
+            unzip -t "$TARGET/wordpress.zip" >/dev/null
+            unzip -t "$TARGET/wpcontent.zip" >/dev/null
+
+            TMP_DIR="$(mktemp -d)"
+            trap 'rm -rf "$TMP_DIR"' EXIT
+            unzip -q "$TARGET/wordpress.zip" -d "$TMP_DIR"
+            CORE_DIR="$TMP_DIR/wordpress"
+
+            rm -rf "$WP_ROOT/wp-admin" "$WP_ROOT/wp-includes"
+            find "$WP_ROOT" -maxdepth 1 -type f -name "*.php" ! -name "wp-config.php" -delete
+            find "$CORE_DIR" -mindepth 1 -maxdepth 1 ! -name "wp-content" ! -name "wp-config.php" -exec cp -a {} "$WP_ROOT/" \;
+
+            mkdir -p "$WP_ROOT/wp-content"
+            rm -rf "$WP_ROOT/wp-content/plugins" "$WP_ROOT/wp-content/themes" "$WP_ROOT/wp-content/mu-plugins"
+            unzip -q -o "$TARGET/wpcontent.zip" -d "$WP_ROOT/wp-content"
+
+            docker compose -f "$COMPOSE_FILE" up -d --pull always
+
+            rm -f "$WP_ROOT/.maintenance"
+            rm -f "$TARGET/wordpress.zip" "$TARGET/wpcontent.zip"
